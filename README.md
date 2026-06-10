@@ -2,7 +2,7 @@
 
 A production-grade, medallion-architecture data lakehouse on AWS. A real standalone e-commerce app generates live transactional data — the pipeline extracts, transforms, and serves it as analytics-ready tables.
 
-> **Status:** Phase 1 — Foundation (In Progress)
+> **Status:** Phase 2 — E-Commerce App (Complete)
 
 ---
 
@@ -128,91 +128,65 @@ flowchart TD
 ```
 datalakehouse-pipeline-aws/
 │
-├── app/                                # Standalone e-commerce application
+├── app/                                # Standalone e-commerce application (Phase 2 ✅)
 │   ├── backend/
-│   │   ├── main.py                     # FastAPI entrypoint
-│   │   ├── database.py                 # SQLAlchemy engine + session
-│   │   ├── models/                     # ORM models (User, Product, Order, etc.)
-│   │   ├── routes/                     # API route handlers
-│   │   ├── schemas/                    # Pydantic request/response schemas
+│   │   ├── main.py                     # FastAPI entrypoint + lifespan (DB init, seed)
+│   │   ├── database.py                 # SQLAlchemy engine + session factory
+│   │   ├── models.py                   # ORM models: User, Product, Order, OrderItem, Payment, PageView
+│   │   ├── auth.py                     # JWT helpers: hash, verify, create token, get_current_user
+│   │   ├── config.py                   # Env-var config (DATABASE_URL, SECRET_KEY)
+│   │   ├── seed.py                     # Product seed data (runs once on startup)
+│   │   ├── routes/
+│   │   │   ├── auth.py                 # /login, /register, /logout
+│   │   │   ├── products.py             # /, /products/{id} — with page view logging
+│   │   │   ├── cart.py                 # /cart, /cart/add, /cart/update, /cart/remove
+│   │   │   └── orders.py              # /checkout, /orders, /orders/{id}
 │   │   └── requirements.txt
 │   ├── frontend/
-│   │   ├── templates/                  # Jinja2 HTML templates
-│   │   └── static/                     # CSS + JS
-│   ├── docker-compose.yml              # App + Postgres (local dev)
+│   │   ├── templates/                  # Jinja2 HTML: base, index, product, cart,
+│   │   │   │                           #   checkout, orders, order_detail, login, register
+│   │   └── static/css/style.css
+│   ├── .env.example                    # Copy to .env before docker-compose up
+│   ├── docker-compose.yml              # app + postgres services
 │   └── Dockerfile
 │
-├── terraform/                          # All AWS infrastructure
+├── terraform/                          # AWS infrastructure (Phase 1 ✅)
 │   ├── modules/
-│   │   ├── s3/                         # S3 buckets + lifecycle policies
-│   │   ├── glue/                       # Glue catalog, crawlers, jobs
-│   │   ├── rds/                        # RDS PostgreSQL (app database in cloud)
-│   │   ├── athena/                     # Athena workgroups
-│   │   ├── iam/                        # IAM roles and policies
-│   │   ├── step_functions/             # Orchestration state machines
-│   │   └── monitoring/                 # CloudWatch alarms + dashboards
-│   ├── environments/
-│   │   ├── dev/                        # Dev environment (wires modules)
-│   │   └── prod/                       # Prod environment
-│   └── global/                         # Shared provider config
+│   │   ├── s3/                         # Raw, processed, athena-results, glue-scripts buckets
+│   │   ├── glue/                       # Glue catalog DBs, crawlers, jobs (phase-gated)
+│   │   ├── rds/                        # RDS PostgreSQL — same schema as app (Phase 2)
+│   │   ├── athena/                     # Athena workgroup + 1 GB scan limit
+│   │   ├── iam/                        # Glue extraction/ETL roles, Step Functions role
+│   │   ├── dynamodb/                   # Watermarks table (last_extracted_at per table)
+│   │   ├── networking/                 # VPC, subnets, security groups for RDS + Glue
+│   │   ├── step_functions/             # State machine skeleton (Phase 6)
+│   │   └── monitoring/                 # CloudWatch alarms + SNS (Phase 7)
+│   ├── main.tf                         # Wires all modules (phase-gated comments)
+│   ├── variables.tf
+│   ├── outputs.tf
+│   ├── providers.tf
+│   └── terraform.tfvars.example
 │
-├── pipeline/                           # Data pipeline source code
-│   ├── extraction/
-│   │   └── glue_jobs/
-│   │       ├── extract_orders.py       # Glue job: RDS orders → Bronze S3
-│   │       ├── extract_customers.py
-│   │       ├── extract_products.py
-│   │       ├── extract_payments.py
-│   │       └── extract_page_views.py
-│   ├── transformation/
-│   │   └── glue_jobs/
-│   │       ├── bronze_to_silver/
-│   │       │   ├── orders_silver.py
-│   │       │   ├── customers_silver.py
-│   │       │   ├── products_silver.py
-│   │       │   └── payments_silver.py
-│   │       └── silver_to_gold/
-│   │           ├── daily_sales.py
-│   │           ├── customer_ltv.py
-│   │           └── top_products.py
-│   ├── quality/                        # Great Expectations suites
-│   └── utils/                          # Shared helpers (watermark, S3, secrets)
+│   # ── Future phases ────────────────────────────────────────────────────────
 │
-├── athena/
-│   ├── queries/
-│   │   ├── analytics/                  # Business metric SQL
-│   │   └── validation/                 # Data quality SQL checks
-│   └── views/                          # Gold layer Athena views
+├── pipeline/                           # Glue job source code (Phase 3+)
+│   ├── extraction/glue_jobs/           # extract_{table}.py — watermark JDBC → Bronze S3
+│   ├── transformation/glue_jobs/
+│   │   ├── bronze_to_silver/           # PySpark: type-cast, dedup, null-handle
+│   │   └── silver_to_gold/             # PySpark: daily_sales, customer_ltv, top_products
+│   ├── quality/                        # Great Expectations suites (Phase 8)
+│   └── utils/                          # Watermark helper, S3 helper, Secrets helper
 │
-├── orchestration/
-│   └── step_functions/
-│       ├── pipeline_definition.json    # Full pipeline state machine (ASL)
-│       └── README.md
-│
-├── monitoring/
-│   ├── dashboards/
-│   └── alarms/
-│
+├── athena/queries/                     # Analytics + validation SQL (Phase 5)
+├── orchestration/step_functions/       # ASL pipeline definition JSON (Phase 6)
+├── monitoring/                         # CloudWatch dashboard + alarm JSON (Phase 7)
 ├── tests/
-│   ├── unit/                           # Test transforms (no AWS needed)
-│   ├── integration/                    # Test against real dev AWS
-│   └── app/                            # App unit + API tests
+│   ├── unit/                           # Transform unit tests (no AWS)
+│   ├── integration/                    # Real AWS dev account required
+│   └── app/                            # FastAPI TestClient tests
 │
-├── docs/
-│   ├── architecture/
-│   │   ├── decisions/                  # Architecture Decision Records (ADRs)
-│   │   └── data-flow.md
-│   └── phases/
-│
-├── scripts/
-│   ├── setup.sh
-│   ├── deploy-pipeline.sh
-│   └── teardown.sh
-│
-├── .github/workflows/
-├── Makefile
-├── pyproject.toml
-├── .pre-commit-config.yaml
+├── pyproject.toml                      # ruff + pytest config
+├── .gitignore
 ├── CLAUDE.md
 └── README.md
 ```
@@ -223,8 +197,8 @@ datalakehouse-pipeline-aws/
 
 | Phase | Name | What Gets Built | Status |
 |---|---|---|---|
-| 1 | Foundation | S3 buckets, IAM roles, Glue Catalog, Athena workgroup — all via Terraform (local state) | In Progress |
-| 2 | E-Commerce App | FastAPI app + PostgreSQL + Docker Compose. Users, products, orders, payments, page views. | Not Started |
+| 1 | Foundation | S3 buckets, IAM roles, Glue Catalog, Athena workgroup — all via Terraform (local state) | ✅ Complete |
+| 2 | E-Commerce App | FastAPI app + PostgreSQL + Docker Compose. Users, products, orders, payments, page views. | ✅ Complete |
 | 3 | Extraction Layer | Glue JDBC jobs: extract from RDS → write CSV to Bronze S3 with watermarking | Not Started |
 | 4 | ETL Layer | Glue PySpark jobs: Bronze CSV → Silver Parquet (typed, deduplicated, partitioned) | Not Started |
 | 5 | Gold + Query Layer | Silver aggregations → Gold tables. Athena SQL analytics queries. | Not Started |
@@ -327,15 +301,20 @@ The app never knows the pipeline exists. The pipeline never modifies app data. T
 
 ```bash
 cd app
+cp .env.example .env          # defaults work as-is for local dev
 docker-compose up
-# App: http://localhost:8000
+# App:      http://localhost:8000
 # Postgres: localhost:5432
 ```
+
+On first start the app creates all tables and seeds 20 products automatically.
 
 ### Deploy Pipeline Infrastructure
 
 ```bash
-cd terraform/environments/dev
+cd terraform
+cp terraform.tfvars.example terraform.tfvars
+# Fill in: alert_email, db_password
 terraform init
 terraform plan
 terraform apply
