@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}My Orders — ShopPulse{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto px-4 py-8">
+  <h1 class="text-2xl font-bold text-gray-800 mb-6">My Orders</h1>
+
+  {% if orders %}
+  <div class="space-y-4">
+    {% for order in orders %}
+    <a href="/orders/{{ order.id }}"
+       class="block bg-white rounded-xl border border-gray-100 p-5 hover:shadow-md transition">
+      <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <div class="text-sm font-bold text-gray-800">Order #{{ order.id }}</div>
+          <div class="text-xs text-gray-400 mt-0.5">{{ order.created_at.strftime('%B %d, %Y at %H:%M') }}</div>
+        </div>
+
+        <div class="flex items-center gap-6">
+          <div class="text-sm text-gray-600">
+            {{ order.items|length }} item{% if order.items|length != 1 %}s{% endif %}
+          </div>
+          <div class="text-base font-bold text-gray-900">${{ "%.2f"|format(order.total|float) }}</div>
+          <span class="px-2.5 py-1 rounded-full text-xs font-medium
+                       {% if order.status == 'confirmed' %}bg-green-100 text-green-700
+                       {% elif order.status == 'shipped' %}bg-blue-100 text-blue-700
+                       {% elif order.status == 'delivered' %}bg-gray-100 text-gray-700
+                       {% else %}bg-yellow-100 text-yellow-700{% endif %}">
+            {{ order.status|capitalize }}
+          </span>
+        </div>
+      </div>
+    </a>
+    {% endfor %}
+  </div>
+
+  {% else %}
+  <div class="text-center py-20">
+    <div class="text-5xl mb-4">📦</div>
+    <p class="text-gray-500 mb-6">No orders yet.</p>
+    <a href="/" class="bg-indigo-600 text-white px-6 py-2.5 rounded-lg hover:bg-indigo-700 transition">Start Shopping</a>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

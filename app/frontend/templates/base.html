@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}ShopPulse{% endblock %}</title>
+  <link rel="icon" href="data:,"  />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="/static/css/style.css" />
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+
+  <!-- Navbar -->
+  <nav class="bg-white border-b border-gray-200 sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/" class="text-xl font-bold text-indigo-600 tracking-tight">ShopPulse</a>
+
+      <div class="flex items-center gap-6">
+        <a href="/" class="text-sm text-gray-600 hover:text-indigo-600 transition">Shop</a>
+
+        <a href="/cart" class="relative text-sm text-gray-600 hover:text-indigo-600 transition">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13l-1.5 6h13M7 13L5.4 5M10 21a1 1 0 100-2 1 1 0 000 2zm7 0a1 1 0 100-2 1 1 0 000 2z" />
+          </svg>
+          {% if cart_count is defined and cart_count > 0 %}
+          <span class="absolute -top-2 -right-2 bg-indigo-600 text-white text-xs rounded-full w-4 h-4 flex items-center justify-center">{{ cart_count }}</span>
+          {% endif %}
+        </a>
+
+        {% if current_user %}
+          <a href="/orders" class="text-sm text-gray-600 hover:text-indigo-600 transition">Orders</a>
+          <span class="text-sm text-gray-400">{{ current_user.name.split()[0] }}</span>
+          <form method="POST" action="/logout" class="inline">
+            <button type="submit" class="text-sm text-gray-400 hover:text-red-500 transition">Logout</button>
+          </form>
+        {% else %}
+          <a href="/login" class="text-sm text-gray-600 hover:text-indigo-600 transition">Login</a>
+          <a href="/register" class="text-sm bg-indigo-600 text-white px-3 py-1.5 rounded-md hover:bg-indigo-700 transition">Register</a>
+        {% endif %}
+      </div>
+    </div>
+  </nav>
+
+  <!-- Content -->
+  <main class="flex-1">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- Footer -->
+  <footer class="border-t border-gray-200 mt-16 py-6 text-center text-sm text-gray-400">
+    ShopPulse &mdash; Data pipeline demo app
+  </footer>
+
+</body>
+</html>
