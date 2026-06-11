@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}{{ product.name }} — ShopPulse{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8">
+
+  <!-- Breadcrumb -->
+  <nav class="text-sm text-gray-400 mb-6">
+    <a href="/" class="hover:text-indigo-600">Shop</a>
+    <span class="mx-2">/</span>
+    <a href="/?category={{ product.category }}" class="hover:text-indigo-600">{{ product.category }}</a>
+    <span class="mx-2">/</span>
+    <span class="text-gray-600">{{ product.name }}</span>
+  </nav>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-10">
+
+    <!-- Image -->
+    <div class="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-2xl flex items-center justify-center h-80">
+      <span class="text-8xl">
+        {% if product.category == 'Electronics' %}🔌
+        {% elif product.category == 'Clothing' %}👕
+        {% elif product.category == 'Books' %}📚
+        {% else %}🏠{% endif %}
+      </span>
+    </div>
+
+    <!-- Details -->
+    <div class="flex flex-col">
+      <span class="text-sm text-indigo-500 font-medium uppercase tracking-wide">{{ product.category }}</span>
+      <h1 class="mt-2 text-2xl font-bold text-gray-900">{{ product.name }}</h1>
+
+      <p class="mt-4 text-gray-600 leading-relaxed">{{ product.description or "No description available." }}</p>
+
+      <div class="mt-6 text-3xl font-bold text-gray-900">${{ "%.2f"|format(product.price|float) }}</div>
+
+      {% if product.stock_qty > 0 %}
+      <p class="mt-1 text-sm text-green-600">✓ In stock ({{ product.stock_qty }} available)</p>
+      {% else %}
+      <p class="mt-1 text-sm text-red-500">✗ Out of stock</p>
+      {% endif %}
+
+      {% if product.stock_qty > 0 %}
+      <form method="POST" action="/cart/add" class="mt-6 flex gap-3">
+        <input type="hidden" name="product_id" value="{{ product.id }}" />
+        <select name="quantity" class="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+          {% for i in range(1, 6) %}
+          <option value="{{ i }}">{{ i }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit"
+                class="flex-1 bg-indigo-600 text-white py-2 px-6 rounded-lg hover:bg-indigo-700 transition font-medium">
+          Add to Cart
+        </button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Related products -->
+  {% if related %}
+  <div class="mt-16">
+    <h2 class="text-lg font-bold text-gray-800 mb-5">More in {{ product.category }}</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+      {% for p in related %}
+      <a href="/products/{{ p.id }}" class="bg-white border border-gray-100 rounded-xl p-4 hover:shadow-md transition">
+        <div class="text-2xl mb-2">
+          {% if p.category == 'Electronics' %}🔌{% elif p.category == 'Clothing' %}👕{% elif p.category == 'Books' %}📚{% else %}🏠{% endif %}
+        </div>
+        <div class="text-sm font-medium text-gray-800 leading-snug line-clamp-2">{{ p.name }}</div>
+        <div class="text-sm font-bold text-indigo-600 mt-2">${{ "%.2f"|format(p.price|float) }}</div>
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

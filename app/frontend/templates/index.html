@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Shop — ShopPulse{% endblock %}
+
+{% block content %}
+<div class="max-w-6xl mx-auto px-4 py-8">
+
+  <!-- Header + category filter -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
+    <h1 class="text-2xl font-bold text-gray-800">
+      {% if active_category %}{{ active_category }}{% else %}All Products{% endif %}
+    </h1>
+
+    <div class="flex flex-wrap gap-2">
+      <a href="/"
+         class="px-3 py-1 rounded-full text-sm border transition
+                {% if not active_category %}bg-indigo-600 text-white border-indigo-600{% else %}text-gray-600 border-gray-300 hover:border-indigo-400{% endif %}">
+        All
+      </a>
+      {% for cat in categories %}
+      <a href="/?category={{ cat }}"
+         class="px-3 py-1 rounded-full text-sm border transition
+                {% if active_category == cat %}bg-indigo-600 text-white border-indigo-600{% else %}text-gray-600 border-gray-300 hover:border-indigo-400{% endif %}">
+        {{ cat }}
+      </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Product grid -->
+  {% if products %}
+  <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+    {% for product in products %}
+    <div class="bg-white rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition flex flex-col">
+      <!-- Image placeholder -->
+      <a href="/products/{{ product.id }}" class="block">
+        <div class="h-44 bg-gradient-to-br from-indigo-50 to-purple-50 rounded-t-xl flex items-center justify-center">
+          <span class="text-4xl">
+            {% if product.category == 'Electronics' %}🔌
+            {% elif product.category == 'Clothing' %}👕
+            {% elif product.category == 'Books' %}📚
+            {% else %}🏠{% endif %}
+          </span>
+        </div>
+      </a>
+
+      <div class="p-4 flex flex-col flex-1">
+        <span class="text-xs text-indigo-500 font-medium uppercase tracking-wide">{{ product.category }}</span>
+        <a href="/products/{{ product.id }}" class="mt-1 text-sm font-semibold text-gray-800 hover:text-indigo-600 leading-snug line-clamp-2">
+          {{ product.name }}
+        </a>
+
+        <div class="mt-auto pt-4 flex items-center justify-between">
+          <span class="text-lg font-bold text-gray-900">${{ "%.2f"|format(product.price|float) }}</span>
+
+          {% if product.stock_qty > 0 %}
+          <form method="POST" action="/cart/add">
+            <input type="hidden" name="product_id" value="{{ product.id }}" />
+            <input type="hidden" name="quantity" value="1" />
+            <button type="submit"
+                    class="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition">
+              Add to Cart
+            </button>
+          </form>
+          {% else %}
+          <span class="text-xs text-red-400 font-medium">Out of stock</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="text-center py-20 text-gray-400">No products found.</div>
+  {% endif %}
+
+</div>
+{% endblock %}
