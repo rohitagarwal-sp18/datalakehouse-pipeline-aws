@@ -1,27 +1,14 @@
-# ─────────────────────────────────────────────────────────────────────────────
-# ROOT TERRAFORM CONFIG — wires all modules together
-#
-# Phase-gated: resources for later phases are commented out with clear labels.
-# Uncomment each section as you progress through the build phases.
-# ─────────────────────────────────────────────────────────────────────────────
-
-# ─── PHASE 1: S3 BUCKETS ─────────────────────────────────────────────────────
-
 module "s3" {
   source  = "./modules/s3"
   project = var.project
   env     = var.env
 }
 
-# ─── PHASE 1: DYNAMODB WATERMARKS ────────────────────────────────────────────
-
 module "dynamodb" {
   source  = "./modules/dynamodb"
   project = var.project
   env     = var.env
 }
-
-# ─── PHASE 1: IAM ROLES ──────────────────────────────────────────────────────
 
 module "iam" {
   source  = "./modules/iam"
@@ -35,7 +22,30 @@ module "iam" {
   watermarks_table_arn      = module.dynamodb.watermarks_table_arn
 }
 
-# ─── PHASE 1: GLUE CATALOG DATABASES ─────────────────────────────────────────
+module "networking" {
+  source  = "./modules/networking"
+  project = var.project
+  env     = var.env
+}
+
+module "rds" {
+  source  = "./modules/rds"
+  project = var.project
+  env     = var.env
+
+  vpc_id                = module.networking.vpc_id
+  subnet_ids            = module.networking.subnet_ids
+  rds_security_group_id = module.networking.rds_security_group_id
+
+  db_name     = var.db_name
+  db_username = var.db_username
+  db_password = var.db_password
+
+  instance_class      = "db.t3.micro"
+  allocated_storage   = 20
+  multi_az            = false
+  deletion_protection = false
+}
 
 module "glue" {
   source  = "./modules/glue"
@@ -48,91 +58,111 @@ module "glue" {
   processed_bucket_id      = module.s3.processed_bucket_id
   glue_scripts_bucket_id   = module.s3.glue_scripts_bucket_id
 
-  # Phase 3: set to true and fill in RDS connection vars below
-  create_jdbc_connection = false
-  create_crawlers        = false
-  extraction_jobs        = {}
-  etl_jobs               = {}
+  create_jdbc_connection = true
+  create_crawlers        = true
 
-  # Phase 3: uncomment and fill in when RDS module is enabled
-  # rds_endpoint           = module.rds.endpoint
-  # rds_db_name            = var.db_name
-  # rds_username           = var.db_username
-  # rds_password           = var.db_password
-  # rds_availability_zone  = module.networking.first_subnet_az
-  # glue_security_group_id = module.networking.glue_security_group_id
-  # rds_subnet_id          = module.networking.first_subnet_id
+  rds_endpoint           = module.rds.endpoint
+  rds_db_name            = var.db_name
+  rds_username           = var.db_username
+  rds_password           = var.db_password
+  rds_availability_zone  = module.networking.first_subnet_az
+  glue_security_group_id = module.networking.glue_security_group_id
+  rds_subnet_id          = module.networking.first_subnet_id
 
-  # Phase 3: uncomment when extraction scripts are uploaded to S3
-  # extraction_jobs = {
-  #   "extract-orders" = {
-  #     script_name = "extract_orders.py"
-  #     num_workers = 2
-  #     worker_type = "G.1X"
-  #     extra_args  = {}
-  #   }
-  #   "extract-customers" = {
-  #     script_name = "extract_customers.py"
-  #     num_workers = 2
-  #     worker_type = "G.1X"
-  #     extra_args  = {}
-  #   }
-  #   "extract-products" = {
-  #     script_name = "extract_products.py"
-  #     num_workers = 2
-  #     worker_type = "G.1X"
-  #     extra_args  = {}
-  #   }
-  #   "extract-payments" = {
-  #     script_name = "extract_payments.py"
-  #     num_workers = 2
-  #     worker_type = "G.1X"
-  #     extra_args  = {}
-  #   }
-  #   "extract-page-views" = {
-  #     script_name = "extract_page_views.py"
-  #     num_workers = 2
-  #     worker_type = "G.1X"
-  #     extra_args  = {}
-  #   }
-  # }
+  extraction_jobs = {
+    "extract-orders" = {
+      script_name = "extract_orders.py"
+      num_workers = 2
+      worker_type = "G.1X"
+      extra_args = {
+        "--extra-py-files" = "s3://${module.s3.glue_scripts_bucket_id}/libs/watermark.py,s3://${module.s3.glue_scripts_bucket_id}/libs/secrets_helper.py"
+      }
+    }
+    "extract-customers" = {
+      script_name = "extract_customers.py"
+      num_workers = 2
+      worker_type = "G.1X"
+      extra_args = {
+        "--extra-py-files" = "s3://${module.s3.glue_scripts_bucket_id}/libs/watermark.py,s3://${module.s3.glue_scripts_bucket_id}/libs/secrets_helper.py"
+      }
+    }
+    "extract-products" = {
+      script_name = "extract_products.py"
+      num_workers = 2
+      worker_type = "G.1X"
+      extra_args = {
+        "--extra-py-files" = "s3://${module.s3.glue_scripts_bucket_id}/libs/watermark.py,s3://${module.s3.glue_scripts_bucket_id}/libs/secrets_helper.py"
+      }
+    }
+    "extract-payments" = {
+      script_name = "extract_payments.py"
+      num_workers = 2
+      worker_type = "G.1X"
+      extra_args = {
+        "--extra-py-files" = "s3://${module.s3.glue_scripts_bucket_id}/libs/watermark.py,s3://${module.s3.glue_scripts_bucket_id}/libs/secrets_helper.py"
+      }
+    }
+    "extract-page-views" = {
+      script_name = "extract_page_views.py"
+      num_workers = 2
+      worker_type = "G.1X"
+      extra_args = {
+        "--extra-py-files" = "s3://${module.s3.glue_scripts_bucket_id}/libs/watermark.py,s3://${module.s3.glue_scripts_bucket_id}/libs/secrets_helper.py"
+      }
+    }
+  }
 
-  # Phase 4: uncomment when ETL scripts are uploaded to S3
-  # etl_jobs = {
-  #   "bronze-to-silver-orders" = {
-  #     script_name = "orders_silver.py"
-  #     num_workers = 2
-  #     worker_type = "G.1X"
-  #     extra_args  = {}
-  #   }
-  #   "bronze-to-silver-customers" = {
-  #     script_name = "customers_silver.py"
-  #     num_workers = 2
-  #     worker_type = "G.1X"
-  #     extra_args  = {}
-  #   }
-  #   "bronze-to-silver-payments" = {
-  #     script_name = "payments_silver.py"
-  #     num_workers = 2
-  #     worker_type = "G.1X"
-  #     extra_args  = {}
-  #   }
-  #   "silver-to-gold-daily-sales" = {
-  #     script_name = "daily_sales.py"
-  #     num_workers = 2
-  #     worker_type = "G.1X"
-  #     extra_args  = {}
-  #   }
-  #   "silver-to-gold-customer-ltv" = {
-  #     script_name = "customer_ltv.py"
-  #     num_workers = 2
-  #     worker_type = "G.1X"
-  #     extra_args  = {}
-  #   }
-  # }
+  etl_jobs = {
+    "bronze-to-silver-orders" = {
+      script_name = "orders_silver.py"
+      num_workers = 2
+      worker_type = "G.1X"
+      extra_args  = {}
+    }
+    "bronze-to-silver-customers" = {
+      script_name = "customers_silver.py"
+      num_workers = 2
+      worker_type = "G.1X"
+      extra_args  = {}
+    }
+    "bronze-to-silver-products" = {
+      script_name = "products_silver.py"
+      num_workers = 2
+      worker_type = "G.1X"
+      extra_args  = {}
+    }
+    "bronze-to-silver-payments" = {
+      script_name = "payments_silver.py"
+      num_workers = 2
+      worker_type = "G.1X"
+      extra_args  = {}
+    }
+    "silver-to-gold-daily-sales" = {
+      script_name = "daily_sales.py"
+      num_workers = 2
+      worker_type = "G.1X"
+      extra_args  = {}
+    }
+    "silver-to-gold-customer-ltv" = {
+      script_name = "customer_ltv.py"
+      num_workers = 2
+      worker_type = "G.1X"
+      extra_args  = {}
+    }
+    "silver-to-gold-top-products" = {
+      script_name = "top_products.py"
+      num_workers = 2
+      worker_type = "G.1X"
+      extra_args  = {}
+    }
+    "silver-to-gold-funnel" = {
+      script_name = "funnel_analysis.py"
+      num_workers = 2
+      worker_type = "G.1X"
+      extra_args  = {}
+    }
+  }
 }
-
-# ─── PHASE 1: ATHENA WORKGROUP ───────────────────────────────────────────────
 
 module "athena" {
   source  = "./modules/athena"
@@ -140,67 +170,103 @@ module "athena" {
   env     = var.env
 
   results_bucket_id    = module.s3.athena_results_bucket_id
-  bytes_scanned_cutoff = 1073741824 # 1 GB safety limit per query
+  bytes_scanned_cutoff = 1073741824
 }
 
-# ─── PHASE 2: NETWORKING + RDS ───────────────────────────────────────────────
-# Uncomment when building the e-commerce app
+module "step_functions" {
+  source  = "./modules/step_functions"
+  project = var.project
+  env     = var.env
 
-# module "networking" {
-#   source  = "./modules/networking"
-#   project = var.project
-#   env     = var.env
-# }
-#
-# module "rds" {
-#   source  = "./modules/rds"
-#   project = var.project
-#   env     = var.env
-#
-#   vpc_id                = module.networking.vpc_id
-#   subnet_ids            = module.networking.subnet_ids
-#   rds_security_group_id = module.networking.rds_security_group_id
-#
-#   db_name     = var.db_name
-#   db_username = var.db_username
-#   db_password = var.db_password
-#
-#   instance_class      = "db.t3.micro"
-#   allocated_storage   = 20
-#   multi_az            = false
-#   deletion_protection = false
-# }
+  step_functions_role_arn  = module.iam.step_functions_role_arn
+  state_machine_definition = templatefile("${path.module}/../orchestration/step_functions/pipeline_definition.json.tftpl", {
+    project = var.project
+    env     = var.env
+  })
+}
 
-# ─── PHASE 6: STEP FUNCTIONS ─────────────────────────────────────────────────
-# Uncomment after writing the ASL pipeline definition
+module "monitoring" {
+  source  = "./modules/monitoring"
+  project = var.project
+  env     = var.env
 
-# module "step_functions" {
-#   source  = "./modules/step_functions"
-#   project = var.project
-#   env     = var.env
-#
-#   step_functions_role_arn  = module.iam.step_functions_role_arn
-#   state_machine_definition = file("${path.module}/../orchestration/step_functions/pipeline_definition.json")
-# }
+  alert_email = var.alert_email
 
-# ─── PHASE 7: MONITORING ─────────────────────────────────────────────────────
-# Uncomment after Glue jobs and Step Functions exist
+  glue_job_names = [
+    "extract-orders",
+    "extract-customers",
+    "extract-products",
+    "extract-payments",
+    "extract-page-views",
+    "bronze-to-silver-orders",
+    "bronze-to-silver-customers",
+    "bronze-to-silver-products",
+    "bronze-to-silver-payments",
+    "silver-to-gold-daily-sales",
+    "silver-to-gold-customer-ltv",
+    "silver-to-gold-top-products",
+    "silver-to-gold-funnel",
+  ]
 
-# module "monitoring" {
-#   source  = "./modules/monitoring"
-#   project = var.project
-#   env     = var.env
-#
-#   alert_email = var.alert_email
-#
-#   glue_job_names = [
-#     "extract-orders",
-#     "extract-customers",
-#     "extract-payments",
-#     "bronze-to-silver-orders",
-#     "bronze-to-silver-customers",
-#     "silver-to-gold-daily-sales",
-#   ]
-#
-#   state_machine_arn = module.step_functions.state_machine_arn
-# }
+  state_machine_arn = module.step_functions.state_machine_arn
+}
+
+resource "aws_iam_role" "eventbridge_sfn" {
+  name = "${var.project}-${var.env}-eventbridge-sfn"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = { Service = "events.amazonaws.com" }
+        Action    = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = {
+    Project     = var.project
+    Environment = var.env
+    ManagedBy   = "terraform"
+    Phase       = "6"
+  }
+}
+
+resource "aws_iam_role_policy" "eventbridge_sfn" {
+  name = "${var.project}-${var.env}-eventbridge-sfn"
+  role = aws_iam_role.eventbridge_sfn.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = "states:StartExecution"
+        Resource = module.step_functions.state_machine_arn
+      }
+    ]
+  })
+}
+
+resource "aws_cloudwatch_event_rule" "pipeline_schedule" {
+  name                = "${var.project}-${var.env}-pipeline-schedule"
+  schedule_expression = "cron(0 3 * * ? *)"
+
+  tags = {
+    Project     = var.project
+    Environment = var.env
+    ManagedBy   = "terraform"
+    Phase       = "6"
+  }
+}
+
+resource "aws_cloudwatch_event_target" "pipeline_schedule" {
+  rule     = aws_cloudwatch_event_rule.pipeline_schedule.name
+  arn      = module.step_functions.state_machine_arn
+  role_arn = aws_iam_role.eventbridge_sfn.arn
+
+  input = jsonencode({
+    snsTopicArn = module.monitoring.alert_sns_topic_arn
+  })
+}
