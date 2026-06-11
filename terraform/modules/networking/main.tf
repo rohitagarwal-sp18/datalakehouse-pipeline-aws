@@ -54,7 +54,7 @@ resource "aws_security_group" "rds" {
 
 resource "aws_security_group" "glue" {
   name        = "${local.prefix}-glue-sg"
-  description = "Security group for Glue JDBC connections — self-referencing rule required by Glue"
+  description = "Security group for Glue JDBC connections - self-referencing rule required by Glue"
   vpc_id      = data.aws_vpc.default.id
 
   # Glue requires a self-referencing inbound rule to allow DPU-to-DPU communication
