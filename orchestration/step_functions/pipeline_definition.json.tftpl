@@ -1,0 +1,591 @@
+{
+  "Comment": "Data Lakehouse Pipeline: Extract → Bronze Crawl → Silver Transform → Silver Crawl → Gold Transform → Gold Crawl",
+  "StartAt": "ExtractAllTables",
+  "States": {
+    "ExtractAllTables": {
+      "Type": "Parallel",
+      "Comment": "Run all extraction jobs concurrently",
+      "Branches": [
+        {
+          "StartAt": "Extract.Orders",
+          "States": {
+            "Extract.Orders": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync:2",
+              "Parameters": {
+                "JobName": "${project}-${env}-extract-orders"
+              },
+              "ResultPath": null,
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "Next": "ExtractOrders.Failed",
+                  "ResultPath": "$.error"
+                }
+              ],
+              "End": true
+            },
+            "ExtractOrders.Failed": {
+              "Type": "Pass",
+              "Parameters": {
+                "error.$": "$.error",
+                "failedJob": "extract-orders"
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Extract.Customers",
+          "States": {
+            "Extract.Customers": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync:2",
+              "Parameters": {
+                "JobName": "${project}-${env}-extract-customers"
+              },
+              "ResultPath": null,
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "Next": "ExtractCustomers.Failed",
+                  "ResultPath": "$.error"
+                }
+              ],
+              "End": true
+            },
+            "ExtractCustomers.Failed": {
+              "Type": "Pass",
+              "Parameters": {
+                "error.$": "$.error",
+                "failedJob": "extract-customers"
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Extract.Products",
+          "States": {
+            "Extract.Products": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync:2",
+              "Parameters": {
+                "JobName": "${project}-${env}-extract-products"
+              },
+              "ResultPath": null,
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "Next": "ExtractProducts.Failed",
+                  "ResultPath": "$.error"
+                }
+              ],
+              "End": true
+            },
+            "ExtractProducts.Failed": {
+              "Type": "Pass",
+              "Parameters": {
+                "error.$": "$.error",
+                "failedJob": "extract-products"
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Extract.Payments",
+          "States": {
+            "Extract.Payments": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync:2",
+              "Parameters": {
+                "JobName": "${project}-${env}-extract-payments"
+              },
+              "ResultPath": null,
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "Next": "ExtractPayments.Failed",
+                  "ResultPath": "$.error"
+                }
+              ],
+              "End": true
+            },
+            "ExtractPayments.Failed": {
+              "Type": "Pass",
+              "Parameters": {
+                "error.$": "$.error",
+                "failedJob": "extract-payments"
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Extract.PageViews",
+          "States": {
+            "Extract.PageViews": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync:2",
+              "Parameters": {
+                "JobName": "${project}-${env}-extract-page-views"
+              },
+              "ResultPath": null,
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "Next": "ExtractPageViews.Failed",
+                  "ResultPath": "$.error"
+                }
+              ],
+              "End": true
+            },
+            "ExtractPageViews.Failed": {
+              "Type": "Pass",
+              "Parameters": {
+                "error.$": "$.error",
+                "failedJob": "extract-page-views"
+              },
+              "End": true
+            }
+          }
+        }
+      ],
+      "ResultPath": "$.extractResults",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "NotifyFailure",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "RunBronzeCrawler"
+    },
+    "RunBronzeCrawler": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+      "Parameters": {
+        "Name": "${project}-${env}-bronze-crawler"
+      },
+      "ResultPath": null,
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "NotifyFailure",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "WaitBronzeCrawler"
+    },
+    "WaitBronzeCrawler": {
+      "Type": "Wait",
+      "Seconds": 60,
+      "Next": "CheckBronzeCrawler"
+    },
+    "CheckBronzeCrawler": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+      "Parameters": {
+        "Name": "${project}-${env}-bronze-crawler"
+      },
+      "ResultPath": "$.bronzeCrawler",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "NotifyFailure",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "BronzeCrawlerDone"
+    },
+    "BronzeCrawlerDone": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.bronzeCrawler.Crawler.State",
+          "StringEquals": "RUNNING",
+          "Next": "WaitBronzeCrawler"
+        }
+      ],
+      "Default": "TransformToSilver"
+    },
+    "TransformToSilver": {
+      "Type": "Parallel",
+      "Comment": "Run all Bronze-to-Silver transformation jobs concurrently",
+      "Branches": [
+        {
+          "StartAt": "Transform.Orders.Silver",
+          "States": {
+            "Transform.Orders.Silver": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync:2",
+              "Parameters": {
+                "JobName": "${project}-${env}-bronze-to-silver-orders"
+              },
+              "ResultPath": null,
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "Next": "TransformOrdersSilver.Failed",
+                  "ResultPath": "$.error"
+                }
+              ],
+              "End": true
+            },
+            "TransformOrdersSilver.Failed": {
+              "Type": "Pass",
+              "Parameters": {
+                "error.$": "$.error",
+                "failedJob": "bronze-to-silver-orders"
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Transform.Customers.Silver",
+          "States": {
+            "Transform.Customers.Silver": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync:2",
+              "Parameters": {
+                "JobName": "${project}-${env}-bronze-to-silver-customers"
+              },
+              "ResultPath": null,
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "Next": "TransformCustomersSilver.Failed",
+                  "ResultPath": "$.error"
+                }
+              ],
+              "End": true
+            },
+            "TransformCustomersSilver.Failed": {
+              "Type": "Pass",
+              "Parameters": {
+                "error.$": "$.error",
+                "failedJob": "bronze-to-silver-customers"
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Transform.Products.Silver",
+          "States": {
+            "Transform.Products.Silver": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync:2",
+              "Parameters": {
+                "JobName": "${project}-${env}-bronze-to-silver-products"
+              },
+              "ResultPath": null,
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "Next": "TransformProductsSilver.Failed",
+                  "ResultPath": "$.error"
+                }
+              ],
+              "End": true
+            },
+            "TransformProductsSilver.Failed": {
+              "Type": "Pass",
+              "Parameters": {
+                "error.$": "$.error",
+                "failedJob": "bronze-to-silver-products"
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Transform.Payments.Silver",
+          "States": {
+            "Transform.Payments.Silver": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync:2",
+              "Parameters": {
+                "JobName": "${project}-${env}-bronze-to-silver-payments"
+              },
+              "ResultPath": null,
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "Next": "TransformPaymentsSilver.Failed",
+                  "ResultPath": "$.error"
+                }
+              ],
+              "End": true
+            },
+            "TransformPaymentsSilver.Failed": {
+              "Type": "Pass",
+              "Parameters": {
+                "error.$": "$.error",
+                "failedJob": "bronze-to-silver-payments"
+              },
+              "End": true
+            }
+          }
+        }
+      ],
+      "ResultPath": "$.silverResults",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "NotifyFailure",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "RunSilverCrawler"
+    },
+    "RunSilverCrawler": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+      "Parameters": {
+        "Name": "${project}-${env}-silver-crawler"
+      },
+      "ResultPath": null,
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "NotifyFailure",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "WaitSilverCrawler"
+    },
+    "WaitSilverCrawler": {
+      "Type": "Wait",
+      "Seconds": 60,
+      "Next": "CheckSilverCrawler"
+    },
+    "CheckSilverCrawler": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+      "Parameters": {
+        "Name": "${project}-${env}-silver-crawler"
+      },
+      "ResultPath": "$.silverCrawler",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "NotifyFailure",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "SilverCrawlerDone"
+    },
+    "SilverCrawlerDone": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.silverCrawler.Crawler.State",
+          "StringEquals": "RUNNING",
+          "Next": "WaitSilverCrawler"
+        }
+      ],
+      "Default": "TransformToGold"
+    },
+    "TransformToGold": {
+      "Type": "Parallel",
+      "Comment": "Run all Silver-to-Gold aggregation jobs concurrently",
+      "Branches": [
+        {
+          "StartAt": "Gold.DailySales",
+          "States": {
+            "Gold.DailySales": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync:2",
+              "Parameters": {
+                "JobName": "${project}-${env}-silver-to-gold-daily-sales"
+              },
+              "ResultPath": null,
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "Next": "GoldDailySales.Failed",
+                  "ResultPath": "$.error"
+                }
+              ],
+              "End": true
+            },
+            "GoldDailySales.Failed": {
+              "Type": "Pass",
+              "Parameters": {
+                "error.$": "$.error",
+                "failedJob": "silver-to-gold-daily-sales"
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Gold.CustomerLTV",
+          "States": {
+            "Gold.CustomerLTV": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync:2",
+              "Parameters": {
+                "JobName": "${project}-${env}-silver-to-gold-customer-ltv"
+              },
+              "ResultPath": null,
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "Next": "GoldCustomerLTV.Failed",
+                  "ResultPath": "$.error"
+                }
+              ],
+              "End": true
+            },
+            "GoldCustomerLTV.Failed": {
+              "Type": "Pass",
+              "Parameters": {
+                "error.$": "$.error",
+                "failedJob": "silver-to-gold-customer-ltv"
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Gold.TopProducts",
+          "States": {
+            "Gold.TopProducts": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync:2",
+              "Parameters": {
+                "JobName": "${project}-${env}-silver-to-gold-top-products"
+              },
+              "ResultPath": null,
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "Next": "GoldTopProducts.Failed",
+                  "ResultPath": "$.error"
+                }
+              ],
+              "End": true
+            },
+            "GoldTopProducts.Failed": {
+              "Type": "Pass",
+              "Parameters": {
+                "error.$": "$.error",
+                "failedJob": "silver-to-gold-top-products"
+              },
+              "End": true
+            }
+          }
+        },
+        {
+          "StartAt": "Gold.Funnel",
+          "States": {
+            "Gold.Funnel": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::glue:startJobRun.sync:2",
+              "Parameters": {
+                "JobName": "${project}-${env}-silver-to-gold-funnel"
+              },
+              "ResultPath": null,
+              "Catch": [
+                {
+                  "ErrorEquals": ["States.ALL"],
+                  "Next": "GoldFunnel.Failed",
+                  "ResultPath": "$.error"
+                }
+              ],
+              "End": true
+            },
+            "GoldFunnel.Failed": {
+              "Type": "Pass",
+              "Parameters": {
+                "error.$": "$.error",
+                "failedJob": "silver-to-gold-funnel"
+              },
+              "End": true
+            }
+          }
+        }
+      ],
+      "ResultPath": "$.goldResults",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "NotifyFailure",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "RunGoldCrawler"
+    },
+    "RunGoldCrawler": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:glue:startCrawler",
+      "Parameters": {
+        "Name": "${project}-${env}-gold-crawler"
+      },
+      "ResultPath": null,
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "NotifyFailure",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "WaitGoldCrawler"
+    },
+    "WaitGoldCrawler": {
+      "Type": "Wait",
+      "Seconds": 60,
+      "Next": "CheckGoldCrawler"
+    },
+    "CheckGoldCrawler": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::aws-sdk:glue:getCrawler",
+      "Parameters": {
+        "Name": "${project}-${env}-gold-crawler"
+      },
+      "ResultPath": "$.goldCrawler",
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "NotifyFailure",
+          "ResultPath": "$.error"
+        }
+      ],
+      "Next": "GoldCrawlerDone"
+    },
+    "GoldCrawlerDone": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.goldCrawler.Crawler.State",
+          "StringEquals": "RUNNING",
+          "Next": "WaitGoldCrawler"
+        }
+      ],
+      "Default": "PipelineSucceeded"
+    },
+    "PipelineSucceeded": {
+      "Type": "Succeed"
+    },
+    "NotifyFailure": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn.$": "$$.Execution.Input.snsTopicArn",
+        "Subject": "Data Lakehouse Pipeline Failed",
+        "Message.$": "States.Format('Pipeline execution {} failed in state {}. Error: {}', $$.Execution.Name, $$.State.Name, $.error)"
+      },
+      "ResultPath": "$.snsResult",
+      "Next": "PipelineFailed"
+    },
+    "PipelineFailed": {
+      "Type": "Fail",
+      "Error": "PipelineFailed",
+      "Cause": "Pipeline encountered an unrecoverable error. Check SNS notification and CloudWatch logs for details."
+    }
+  }
+}

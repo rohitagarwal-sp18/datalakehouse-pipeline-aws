@@ -2,7 +2,7 @@
 
 A production-grade, medallion-architecture data lakehouse on AWS. A real standalone e-commerce app generates live transactional data — the pipeline extracts, transforms, and serves it as analytics-ready tables.
 
-> **Status:** Phase 2 — E-Commerce App (Complete)
+> **Status:** Phase 8 — Data Quality (Complete) · Phase 9 (Not Started)
 
 ---
 
@@ -199,14 +199,12 @@ datalakehouse-pipeline-aws/
 |---|---|---|---|
 | 1 | Foundation | S3 buckets, IAM roles, Glue Catalog, Athena workgroup — all via Terraform (local state) | ✅ Complete |
 | 2 | E-Commerce App | FastAPI app + PostgreSQL + Docker Compose. Users, products, orders, payments, page views. | ✅ Complete |
-| 3 | Extraction Layer | Glue JDBC jobs: extract from RDS → write CSV to Bronze S3 with watermarking | Not Started |
-| 4 | ETL Layer | Glue PySpark jobs: Bronze CSV → Silver Parquet (typed, deduplicated, partitioned) | Not Started |
-| 5 | Gold + Query Layer | Silver aggregations → Gold tables. Athena SQL analytics queries. | Not Started |
-| 6 | Orchestration | Step Functions: schedule and chain Extract → Crawl → Transform → Validate | Not Started |
-| 7 | Monitoring | CloudWatch alarms for Glue failures, Athena costs, pipeline SLA | Not Started |
-| 8 | Data Quality | Great Expectations checks as pipeline gate — fail pipeline if data quality drops | Not Started |
-| 9 | Advanced | Apache Iceberg table format, CDC via AWS DMS, EMR for scale | Not Started |
-
+| 3 | Extraction Layer | Glue JDBC jobs: extract from RDS → write CSV to Bronze S3 with watermarking | ✅ Complete |
+| 4 | ETL Layer | Glue PySpark jobs: Bronze CSV → Silver Parquet (typed, deduplicated, partitioned) | ✅ Complete |
+| 5 | Gold + Query Layer | Silver aggregations → Gold tables. Athena SQL analytics queries. | ✅ Complete |
+| 6 | Orchestration | Step Functions: schedule and chain Extract → Crawl → Transform → Validate | ✅ Complete |
+| 7 | Monitoring | CloudWatch alarms for Glue failures, Athena costs, pipeline SLA | ✅ Complete |
+| 8 | Data Quality | Great Expectations checks as pipeline gate — fail pipeline if data quality drops | ✅ Complete |
 ---
 
 ## Data Model
@@ -318,6 +316,29 @@ cp terraform.tfvars.example terraform.tfvars
 terraform init
 terraform plan
 terraform apply
+```
+
+### Upload Glue Scripts to S3
+
+After `terraform apply`, upload all pipeline scripts to the Glue scripts bucket:
+
+```bash
+BUCKET=$(terraform output -raw glue_scripts_bucket_name)
+
+# Glue job scripts
+aws s3 sync ../pipeline/extraction/glue_jobs/        s3://$BUCKET/jobs/
+aws s3 sync ../pipeline/transformation/glue_jobs/bronze_to_silver/ s3://$BUCKET/jobs/
+aws s3 sync ../pipeline/transformation/glue_jobs/silver_to_gold/   s3://$BUCKET/jobs/
+aws s3 cp  ../pipeline/quality/run_checks.py         s3://$BUCKET/jobs/
+aws s3 sync ../pipeline/quality/suites/              s3://$BUCKET/jobs/suites/
+
+# Shared utility libs (referenced by --extra-py-files in extraction jobs)
+aws s3 cp ../pipeline/utils/watermark.py      s3://$BUCKET/libs/watermark.py
+aws s3 cp ../pipeline/utils/secrets_helper.py s3://$BUCKET/libs/secrets_helper.py
+
+# PostgreSQL JDBC driver (required by Glue extraction jobs)
+curl -o postgresql-42.7.0.jar https://jdbc.postgresql.org/download/postgresql-42.7.0.jar
+aws s3 cp postgresql-42.7.0.jar s3://$BUCKET/jars/postgresql-42.7.0.jar
 ```
 
 ---

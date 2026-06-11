@@ -1,15 +1,11 @@
-# Copy this file to terraform.tfvars and fill in real values.
-# terraform.tfvars is gitignored — never commit it.
-
 aws_region    = "us-east-1"
 aws_profile   = "learning"
 project       = "datalakehouse"
 env           = "dev"
-current_phase = "1"
+current_phase = "7"
 
 alert_email = "you@example.com"
 
-# ─── Phase 2: fill in when adding RDS ────────────────────────────────────────
 db_name     = "ecommerce"
 db_username = "appuser"
 db_password = "CHANGE_ME_USE_A_STRONG_PASSWORD"
