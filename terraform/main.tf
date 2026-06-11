@@ -208,6 +208,7 @@ module "monitoring" {
     "silver-to-gold-funnel",
   ]
 
+  aws_region        = var.aws_region
   state_machine_arn = module.step_functions.state_machine_arn
 }
 

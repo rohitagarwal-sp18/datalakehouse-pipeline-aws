@@ -1,5 +1,8 @@
+data "aws_caller_identity" "current" {}
+
 locals {
-  prefix = "${var.project}-${var.env}"
+  prefix        = "${var.project}-${var.env}"
+  account_suffix = data.aws_caller_identity.current.account_id
   tags = merge(
     {
       Project     = var.project
@@ -13,7 +16,7 @@ locals {
 # ─── RAW BUCKET (Bronze layer) ───────────────────────────────────────────────
 
 resource "aws_s3_bucket" "raw" {
-  bucket = "${local.prefix}-raw"
+  bucket = "${local.prefix}-raw-${local.account_suffix}"
   tags   = local.tags
 }
 
@@ -58,7 +61,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "raw" {
 # ─── PROCESSED BUCKET (Silver + Gold layers) ─────────────────────────────────
 
 resource "aws_s3_bucket" "processed" {
-  bucket = "${local.prefix}-processed"
+  bucket = "${local.prefix}-processed-${local.account_suffix}"
   tags   = local.tags
 }
 
@@ -86,7 +89,7 @@ resource "aws_s3_bucket_public_access_block" "processed" {
 # ─── ATHENA RESULTS BUCKET ───────────────────────────────────────────────────
 
 resource "aws_s3_bucket" "athena_results" {
-  bucket = "${local.prefix}-athena-results"
+  bucket = "${local.prefix}-athena-results-${local.account_suffix}"
   tags   = local.tags
 }
 
@@ -118,7 +121,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "athena_results" {
 # ─── GLUE SCRIPTS BUCKET ─────────────────────────────────────────────────────
 
 resource "aws_s3_bucket" "glue_scripts" {
-  bucket = "${local.prefix}-glue-scripts"
+  bucket = "${local.prefix}-glue-scripts-${local.account_suffix}"
   tags   = local.tags
 }
 
