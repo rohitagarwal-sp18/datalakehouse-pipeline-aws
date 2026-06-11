@@ -1,0 +1,99 @@
+{
+  "expectation_suite_name": "silver_payments_suite",
+  "meta": {
+    "great_expectations_version": "0.18.x",
+    "layer": "silver",
+    "table": "payments",
+    "description": "Quality checks for the Silver payments table. Validates schema presence, null constraints, allowed status and method values, non-negative amounts, and primary key uniqueness."
+  },
+  "expectations": [
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "id" },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "order_id" },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "amount" },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "method" },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "status" },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_to_exist",
+      "kwargs": { "column": "created_at" },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "id" },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "order_id" },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "amount" },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_values_to_not_be_null",
+      "kwargs": { "column": "status" },
+      "meta": {}
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": {
+        "column": "status",
+        "value_set": ["completed", "failed", "pending", "refunded"]
+      },
+      "meta": {
+        "notes": "Payment status must match the canonical set defined in the app's payments model."
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_in_set",
+      "kwargs": {
+        "column": "method",
+        "value_set": ["card", "paypal", "upi"]
+      },
+      "meta": {
+        "notes": "Payment method must match the supported methods in the app. Add new methods here when the app adds them."
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_between",
+      "kwargs": {
+        "column": "amount",
+        "min_value": 0,
+        "max_value": null
+      },
+      "meta": {
+        "notes": "Payment amounts must be non-negative. Refunds are tracked via status=refunded, not negative amounts."
+      }
+    },
+    {
+      "expectation_type": "expect_column_values_to_be_unique",
+      "kwargs": { "column": "id" },
+      "meta": {
+        "notes": "Primary key — deduplication in the Bronze-to-Silver job should guarantee uniqueness."
+      }
+    }
+  ]
+}
