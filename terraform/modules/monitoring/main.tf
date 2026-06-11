@@ -76,7 +76,7 @@ resource "aws_cloudwatch_event_rule" "sfn_failure" {
     detail-type = ["Step Functions Execution Status Change"]
     detail = {
       status          = ["FAILED", "TIMED_OUT", "ABORTED"]
-      stateMachineArn = var.state_machine_arn != "" ? [var.state_machine_arn] : [{ prefix = "arn:aws:states:" }]
+      stateMachineArn = var.state_machine_arn != "" ? [var.state_machine_arn] : null
     }
   })
 
@@ -116,15 +116,16 @@ resource "aws_cloudwatch_dashboard" "pipeline" {
           title   = "Glue Job Failed Task Count"
           view    = "timeSeries"
           stacked = false
+          region  = var.aws_region
           period  = 300
-          metrics = length(var.glue_job_names) > 0 ? [
+          metrics = [
             for job in var.glue_job_names : [
               "Glue", "glue.driver.aggregate.numFailedTasks",
               "JobName", "${local.prefix}-${job}",
               "Type", "gauge",
               { label = job }
             ]
-          ] : [["Glue", "glue.driver.aggregate.numFailedTasks"]]
+          ]
         }
       },
       {
@@ -137,15 +138,16 @@ resource "aws_cloudwatch_dashboard" "pipeline" {
           title   = "Glue Job Completed Tasks"
           view    = "timeSeries"
           stacked = false
+          region  = var.aws_region
           period  = 300
-          metrics = length(var.glue_job_names) > 0 ? [
+          metrics = [
             for job in var.glue_job_names : [
               "Glue", "glue.driver.aggregate.numCompletedTasks",
               "JobName", "${local.prefix}-${job}",
               "Type", "gauge",
               { label = job }
             ]
-          ] : [["Glue", "glue.driver.aggregate.numCompletedTasks"]]
+          ]
         }
       },
       {
@@ -157,6 +159,7 @@ resource "aws_cloudwatch_dashboard" "pipeline" {
         properties = {
           title   = "Athena Data Scanned (bytes)"
           view    = "timeSeries"
+          region  = var.aws_region
           period  = 300
           metrics = [
             ["AWS/Athena", "DataScannedInBytes", "WorkGroup", "${local.prefix}-workgroup"]
@@ -172,6 +175,7 @@ resource "aws_cloudwatch_dashboard" "pipeline" {
         properties = {
           title   = "Step Functions Executions"
           view    = "timeSeries"
+          region  = var.aws_region
           period  = 300
           metrics = [
             ["AWS/States", "ExecutionsSucceeded", "StateMachineArn", var.state_machine_arn],
